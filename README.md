@@ -16,5 +16,5 @@ Navigate to Player Settings and make sure your Scripting Runtime Version is set 
 Copy  Assets/Plugins folder into your Project's Assets folder.
 
 ## References
-The library is based on [this] (https://assetstore.unity.com/packages/tools/async-await-support-101056) asset.
+The library is based on [this](https://assetstore.unity.com/packages/tools/async-await-support-101056) asset.
 It was enhanced with support for true async style Http requests.

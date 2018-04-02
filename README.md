@@ -39,17 +39,17 @@ Can be used like so:
 ```c#
 
 public async void Start()
-    {
-        var req = await WebRequestUtils.Get("https://ipinfo.io");
+{
+    var req = await WebRequestUtils.Get("https://ipinfo.io");
 
-        Debug.Log(req.ReadToEnd());
-    }
+    Debug.Log(req.ReadToEnd());
+}
     
 public IEnumerator WaitForSomething()
-    {
-         while(isSomethingCompleded)
-             yield return null;
-    }
+{
+     while(isSomethingCompleded)
+         yield return null;
+}
 
 ```
 

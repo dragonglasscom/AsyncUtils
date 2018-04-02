@@ -40,9 +40,7 @@ Can be used like so:
 
 public async void Start()
 {
-    var req = await WebRequestUtils.Get("https://ipinfo.io");
-
-    Debug.Log(req.ReadToEnd());
+    var req = await WaitForSomething();
 }
     
 public IEnumerator WaitForSomething()

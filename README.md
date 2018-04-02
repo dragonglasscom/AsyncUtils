@@ -26,11 +26,11 @@ Theese methods are awaitable, provide cancellation, and are thread safe (posted 
 ```c#
 
 public async void Start()
-    {
-        var req = await WebRequestUtils.Get("https://ipinfo.io");
+{
+    var req = await WebRequestUtils.Get("https://ipinfo.io");
 
-        Debug.Log(req.ReadToEnd());
-    }
+    Debug.Log(req.ReadToEnd());
+}
 ```
 
 ### Awaiting coroutines

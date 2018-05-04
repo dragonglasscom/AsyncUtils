@@ -14,7 +14,7 @@ namespace Plugins.AsyncAwaitUtil.Source
 {
     public static class WebRequestUtils
     {
-        private static async Task<HttpResponseMessage> unsafe_ProcessWebrequest(UnityWebRequest request,
+        private static async Task<HttpResponseMessage> unsafe_send_webrequest(UnityWebRequest request,
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -36,222 +36,146 @@ namespace Plugins.AsyncAwaitUtil.Source
                 //The web request will be completed early with "Aborted error",
                 //Will need to throw here, to indicate that the task was aborted
                 cancellationToken.ThrowIfCancellationRequested();
-
+                
                 return new HttpResponseMessage((HttpStatusCode) request.responseCode, request.downloadHandler.data,
                     request.GetResponseHeaders());
             }
-
         }
-
-        public static async Task<HttpResponseMessage> Get(string uri,
+        
+        public static async Task<HttpResponseMessage> CreateAndSendWebrequest(WebrequestCreationInfo webrequestCreationInfo,
             CancellationToken cancellationToken = new CancellationToken())
         {
-            if (SyncContextUtil.UnitySynchronizationContext == SynchronizationContext.Current)
+            await new WaitForUpdate();
+
+            using (var request = create_web_request(webrequestCreationInfo))
             {
-                //We are on unity thread, all good
-                using (var request = UnityWebRequest.Get(uri))
-                {
-                    return await unsafe_ProcessWebrequest(request, cancellationToken);
-                }
+                return await unsafe_send_webrequest(request, cancellationToken).ConfigureAwait(false);
             }
-
-            //We were called outside of the Unity main thread
-            var tcs = new TaskCompletionSource<HttpResponseMessage>();
-
-            //Push the async method onto Unity's main thread
-            SyncContextUtil.UnitySynchronizationContext.Post(async _ =>
-            {
-                try
-                {
-                    using (var request = UnityWebRequest.Get(uri))
-                    {
-                        var task = unsafe_ProcessWebrequest(request, cancellationToken);
-                        var result = await task;
-                        tcs.SetResult(result);
-                    }
-                }
-                catch (Exception e)
-                {
-                    tcs.SetException(e);
-                }
-            }, null);
-
-            return await tcs.Task;
         }
 
-        public static async Task<HttpResponseMessage> Post(string uri, string postData,
+        private static UnityWebRequest create_web_request(WebrequestCreationInfo requestCreationInfo)
+        {
+            var webrequest = new UnityWebRequest(requestCreationInfo.Url);
+
+            webrequest.method = requestCreationInfo.Method.ToString();
+            
+            webrequest.SetRequestHeader("Content-Type", requestCreationInfo.ContentType);
+
+            if (requestCreationInfo.Data != null && requestCreationInfo.Data.Length != 0)
+                webrequest.uploadHandler = new UploadHandlerRaw(requestCreationInfo.Data);
+
+            webrequest.downloadHandler = new DownloadHandlerBuffer();
+
+            return webrequest;
+        }
+
+        public static Task<HttpResponseMessage> GetAsync(string uri,
+            CancellationToken cancellationToken = new CancellationToken())
+        {
+            var creationInfo = new WebrequestCreationInfo()
+            {
+                Method = WebRequestMethod.GET,
+                Data = new byte[0],
+                Url = uri
+            };
+            return CreateAndSendWebrequest(creationInfo, cancellationToken);
+        }
+
+        public static Task<HttpResponseMessage> PostAsync(string uri, string postData,
             string contentType = "application/json",
             CancellationToken cancellationToken = new CancellationToken())
         {
-            if (SyncContextUtil.UnitySynchronizationContext == SynchronizationContext.Current)
-            {
-                //We are on unity thread, all good
-                using (var request = new UnityWebRequest(uri))
-                {
-                    //Why aren't we using UnityWebRequest.Post you ask?
-                    //well, it ignores content type and encoding no matter what
-                    //Thanks, Unity!
-                    request.method = "POST";
-                    var data = Encoding.UTF8.GetBytes(postData);
-                    var uploadHandler = new UploadHandlerRaw(data);
-                    request.uploadHandler = uploadHandler;
-                    request.downloadHandler = new DownloadHandlerBuffer();
-
-                    request.SetRequestHeader("Content-Type", contentType);
-
-                    return await unsafe_ProcessWebrequest(request, cancellationToken);
-                }
-            }
-
-            //We were called outside of the Unity main thread
-            var tcs = new TaskCompletionSource<HttpResponseMessage>();
-
-            //Push the async method onto Unity's main thread
-            SyncContextUtil.UnitySynchronizationContext.Post(async _ =>
-            {
-                try
-                {
-                    using (var request = new UnityWebRequest(uri))
-                    {
-                        //Why aren't we using UnityWebRequest.Post you ask?
-                        //well, it ignores content type and encoding no matter what
-                        //Thanks, Unity!
-                        request.method = "POST";
-                        var data = Encoding.UTF8.GetBytes(postData);
-                        var uploadHandler = new UploadHandlerRaw(data);
-                        request.uploadHandler = uploadHandler;
-                        request.downloadHandler = new DownloadHandlerBuffer();
-
-                        request.SetRequestHeader("Content-Type", contentType);
-                        var task = unsafe_ProcessWebrequest(request, cancellationToken);
-                        var result = await task;
-                        tcs.SetResult(result);
-                    }
-                }
-                catch (Exception e)
-                {
-                    tcs.SetException(e);
-                }
-            }, null);
-
-            return await tcs.Task;
+            var data = Encoding.UTF8.GetBytes(postData);
+            return PostAsync(uri, data, contentType, cancellationToken);
         }
-
-        public static async Task<HttpResponseMessage> Put(string uri, string postData,
+        
+        public static Task<HttpResponseMessage> PostAsync(string uri, byte[] postData,
             string contentType = "application/json",
             CancellationToken cancellationToken = new CancellationToken())
         {
-            if (SyncContextUtil.UnitySynchronizationContext == SynchronizationContext.Current)
+            var creationInfo = new WebrequestCreationInfo()
             {
-                //We are on unity thread, all good
-                using (var request = new UnityWebRequest(uri))
-                {
-                    //Why aren't we using UnityWebRequest.Put you ask?
-                    //well, it ignores content type and encoding no matter what
-                    //Thanks, Unity!
-                    request.method = "PUT";
-                    var data = Encoding.UTF8.GetBytes(postData);
-                    var uploadHandler = new UploadHandlerRaw(data);
-                    request.uploadHandler = uploadHandler;
-                    request.downloadHandler = new DownloadHandlerBuffer();
-
-                    request.SetRequestHeader("Content-Type", contentType);
-
-                    return await unsafe_ProcessWebrequest(request, cancellationToken);
-                }
-            }
-
-            //We were called outside of the Unity main thread
-            var tcs = new TaskCompletionSource<HttpResponseMessage>();
-
-            //Push the async method onto Unity's main thread
-            SyncContextUtil.UnitySynchronizationContext.Post(async _ =>
-            {
-                try
-                {
-                    using (var request = new UnityWebRequest(uri))
-                    {
-                        //Why aren't we using UnityWebRequest.Put you ask?
-                        //well, it ignores content type and encoding no matter what
-                        //Thanks, Unity!
-                        request.method = "PUT";
-                        var data = Encoding.UTF8.GetBytes(postData);
-                        var uploadHandler = new UploadHandlerRaw(data);
-                        request.uploadHandler = uploadHandler;
-                        request.downloadHandler = new DownloadHandlerBuffer();
-
-                        request.SetRequestHeader("Content-Type", contentType);
-                        var task = unsafe_ProcessWebrequest(request, cancellationToken);
-                        var result = await task;
-                        tcs.SetResult(result);
-                    }
-                }
-                catch (Exception e)
-                {
-                    tcs.SetException(e);
-                }
-            }, null);
-
-            return await tcs.Task;
+                Method = WebRequestMethod.POST,
+                Data = postData,
+                Url = uri,
+                ContentType = contentType
+            };
+            return CreateAndSendWebrequest(creationInfo, cancellationToken);
         }
-
-        public static async Task<HttpResponseMessage> Delete(string uri, string postData = "",
+        
+        public static Task<HttpResponseMessage> PutAsync(string uri, string postData,
             string contentType = "application/json",
             CancellationToken cancellationToken = new CancellationToken())
         {
-            if (SyncContextUtil.UnitySynchronizationContext == SynchronizationContext.Current)
-            {
-                //We are on unity thread, all good
-                using (var request = new UnityWebRequest(uri))
-                {
-                    //Why aren't we using UnityWebRequest.Delete you ask?
-                    //well, it ignores content type and encoding no matter what
-                    //Thanks, Unity!
-                    request.method = "DELETE";
-                    var data = Encoding.UTF8.GetBytes(postData);
-                    var uploadHandler = new UploadHandlerRaw(data);
-                    request.uploadHandler = uploadHandler;
-                    request.downloadHandler = new DownloadHandlerBuffer();
-
-                    request.SetRequestHeader("Content-Type", contentType);
-
-                    return await unsafe_ProcessWebrequest(request, cancellationToken);
-                }
-            }
-
-            //We were called outside of the Unity main thread
-            var tcs = new TaskCompletionSource<HttpResponseMessage>();
-
-            //Push the async method onto Unity's main thread
-            SyncContextUtil.UnitySynchronizationContext.Post(async _ =>
-            {
-                try
-                {
-                    using (var request = new UnityWebRequest(uri))
-                    {
-                        //Why aren't we using UnityWebRequest.Delete you ask?
-                        //well, it ignores content type and encoding no matter what
-                        //Thanks, Unity!
-                        request.method = "DELETE";
-                        var data = Encoding.UTF8.GetBytes(postData);
-                        var uploadHandler = new UploadHandlerRaw(data);
-                        request.uploadHandler = uploadHandler;
-                        request.downloadHandler = new DownloadHandlerBuffer();
-
-                        request.SetRequestHeader("Content-Type", contentType);
-                        var task = unsafe_ProcessWebrequest(request, cancellationToken);
-                        var result = await task;
-                        tcs.SetResult(result);
-                    }
-                }
-                catch (Exception e)
-                {
-                    tcs.SetException(e);
-                }
-            }, null);
-
-            return await tcs.Task;
+            var data = Encoding.UTF8.GetBytes(postData);
+            return PutAsync(uri, data, contentType, cancellationToken);
         }
+
+        public static Task<HttpResponseMessage> PutAsync(string uri, byte[] postData,
+            string contentType = "application/json",
+            CancellationToken cancellationToken = new CancellationToken())
+        {
+            var creationInfo = new WebrequestCreationInfo()
+            {
+                Method = WebRequestMethod.PUT,
+                Data = postData,
+                Url = uri,
+                ContentType = contentType
+            };
+            return CreateAndSendWebrequest(creationInfo, cancellationToken);
+        }
+        
+        public static Task<HttpResponseMessage> DeleteAsync(string uri, string postData = "",
+            string contentType = "application/json",
+            CancellationToken cancellationToken = new CancellationToken())
+        {
+            var data = Encoding.UTF8.GetBytes(postData);
+            return DeleteAsync(uri, data, contentType, cancellationToken);
+        }
+
+        public static Task<HttpResponseMessage> DeleteAsync(string uri, byte[] postData = null,
+            string contentType = "application/json",
+            CancellationToken cancellationToken = new CancellationToken())
+        {
+            var creationInfo = new WebrequestCreationInfo()
+            {
+                Method = WebRequestMethod.DELETE,
+                Data = postData,
+                Url = uri,
+                ContentType = contentType
+            };
+            return CreateAndSendWebrequest(creationInfo, cancellationToken);
+        }
+    }
+
+    public class WebrequestCreationInfo
+    {
+        private string _contentType;
+
+        public WebrequestCreationInfo()
+        {
+            _contentType = "application/json";
+        }
+
+        public string Url { get; set; }
+        
+        public WebRequestMethod Method { get; set; }
+
+        public string ContentType
+        {
+            get { return _contentType; }
+            set { _contentType = value; }
+        }
+
+        public byte[] Data { get; set; }
+    }
+
+    public enum WebRequestMethod
+    {
+        GET,
+        POST,
+        PUT,
+        DELETE
     }
 
     public class HttpResponseMessage

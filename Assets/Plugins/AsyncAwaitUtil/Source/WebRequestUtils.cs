@@ -58,11 +58,14 @@ namespace Plugins.AsyncAwaitUtil.Source
             var webrequest = new UnityWebRequest(requestCreationInfo.Url);
 
             webrequest.method = requestCreationInfo.Method.ToString();
-            
-            webrequest.SetRequestHeader("Content-Type", requestCreationInfo.ContentType);
 
             if (requestCreationInfo.Data != null && requestCreationInfo.Data.Length != 0)
                 webrequest.uploadHandler = new UploadHandlerRaw(requestCreationInfo.Data);
+
+            foreach (var header in requestCreationInfo.Headers)
+            {
+                webrequest.SetRequestHeader(header.Key, header.Value);
+            }
 
             webrequest.downloadHandler = new DownloadHandlerBuffer();
 
@@ -150,11 +153,9 @@ namespace Plugins.AsyncAwaitUtil.Source
 
     public class WebrequestCreationInfo
     {
-        private string _contentType;
-
         public WebrequestCreationInfo()
         {
-            _contentType = "application/json";
+            ContentType = "application/json";
         }
 
         public string Url { get; set; }
@@ -163,9 +164,19 @@ namespace Plugins.AsyncAwaitUtil.Source
 
         public string ContentType
         {
-            get { return _contentType; }
-            set { _contentType = value; }
+            get
+            {
+                string ct = string.Empty;
+                Headers.TryGetValue("Content-Type", out ct);
+                return ct;
+            }
+            set
+            {
+                Headers["Content-Type"] = value;
+            }
         }
+        
+        public Dictionary<string, string> Headers = new Dictionary<string, string>();
 
         public byte[] Data { get; set; }
     }
